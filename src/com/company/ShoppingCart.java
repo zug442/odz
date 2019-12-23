@@ -55,7 +55,52 @@ public class ShoppingCart
 
   items.add(item);
  }
+ private void frameBuilder(String footer[], int align[], int width[], StringBuilder sb) {
+  for (int i = 0; i < footer.length; i++)
+  appendFormatted(sb, footer[i], align[i], width[i]);
+ }
 
+ private void separator(StringBuilder sb, int lineLength) {
+  for (int i = 0; i < lineLength; i++)
+   sb.append("-");
+  sb.append("\n");
+ }
+
+ private class FormattingPreparation {
+  private String[] header;
+  private List<String[]> lines;
+  private String[] footer;
+  public FormattingPreparation() {
+  }
+
+  public void addLines() {
+   FormattingPreparation fP = new FormattingPreparation();
+   fP.header = new String[]{"#","Item","Price","Quan.","Discount","Total"};
+   int index = 0;
+   for (Item item : items) {
+    fP.lines.add(new String[]{
+            String.valueOf(++index),
+            item.title,
+            MONEY.format(item.price),
+            String.valueOf(item.quantity),
+            (calculateDiscount(item.type, item.quantity) == 0) ? "-" : (calculateDiscount(item.type, item.quantity) + "%"),
+            MONEY.format(calculateItemTotal(item, calculateDiscount(item.type, item.quantity)))
+    });
+    fP.footer = new String[] { String.valueOf(index),"","","","",
+            MONEY.format(calculateTotalPrice(item)) };
+   }
+  }
+
+  private double calculateItemTotal(Item item, int discount) {
+   return item.price * item.quantity * (100.00 - discount) / 100.00;
+  }
+
+  private double calculateTotalPrice(Item item) {
+   double total = 0.00;
+   total += calculateItemTotal(item, calculateDiscount(item.type, item.quantity));
+   return total;
+  }
+ }
  /**
   * Formats shopping price.
   *
@@ -74,42 +119,19 @@ public class ShoppingCart
   */
  public String formatTicket()
  {
-  if (items.size() == EMPTY_CART)
-   return "No items.";
-
-  List<String[]> lines = new ArrayList<String[]>();
+  FormattingPreparation formattingPreparation = new FormattingPreparation();
   String[] header = {"#","Item","Price","Quan.","Discount","Total"};
   int[] align = new int[] { 1, -1, 1, 1, 1, 1 };
+  if (items.size() == EMPTY_CART)
+   return "No items.";
   // formatting each line
-  double total = 0.00;
-  int index = 0;
-  for (Item item : items) {
-   int discount = calculateDiscount(item.type, item.quantity);
-   double itemTotal = item.price * item.quantity * (100.00 - discount) / 100.00;
-
-   lines.add(new String[]{
-           String.valueOf(++index),
-           item.title,
-           MONEY.format(item.price),
-           String.valueOf(item.quantity),
-           (discount == 0) ? "-" : (String.valueOf(discount) + "%"),
-           MONEY.format(itemTotal)
-   });
-   total += itemTotal;
-  }
-  String[] footer = { String.valueOf(index),"","","","",
-          MONEY.format(total) };
-  // formatting table
+  formattingPreparation.addLines();
 
   // column max length
   int[] width = new int[]{0,0,0,0,0,0};
-  for (String[] line : lines)
+  for (String[] line : formattingPreparation.lines)
    for (int i = 0; i < line.length; i++)
-    width[i] = (int) Math.max(width[i], line[i].length());
-  for (int i = 0; i < header.length; i++)
-   width[i] = (int) Math.max(width[i], header[i].length());
-  for (int i = 0; i < footer.length; i++)
-   width[i] = (int) Math.max(width[i], footer[i].length());
+    width[i] = Math.max(width[i], line[i].length());
 
   // line length
   int lineLength = width.length - 1;
@@ -117,29 +139,24 @@ public class ShoppingCart
    lineLength += w;
 
   StringBuilder sb = new StringBuilder();
+  sb.append("\n");
   // header
-  for (int i = 0; i < header.length; i++)
-   appendFormatted(sb, header[i], align[i], width[i]);
-  sb.append("\n");
+  frameBuilder(header,align,width,sb);
   // separator
-  for (int i = 0; i < lineLength; i++)
-   sb.append("-");
-  sb.append("\n");
+  separator(sb,lineLength);
   // lines
-  for (String[] line : lines) {
-   for (int i = 0; i < line.length; i++)
-    appendFormatted(sb, line[i], align[i], width[i]);
+  for (String[] line : formattingPreparation.lines) {
+   frameBuilder(line,align,width,sb);
    sb.append("\n");
   }
-  if (lines.size() > 0) {
+
+  if (formattingPreparation.lines.size() > 0) {
    // separator
-   for (int i = 0; i < lineLength; i++)
-    sb.append("-");
-   sb.append("\n");
+   separator(sb, lineLength);
   }
   // footer
-  for (int i = 0; i < footer.length; i++)
-   appendFormatted(sb, footer[i], align[i], width[i]);
+  frameBuilder(formattingPreparation.footer,align,width,sb);
+
   return sb.toString();
  }
  // --- private section -----------------------------------------------------
@@ -149,6 +166,7 @@ public class ShoppingCart
   symbols.setDecimalSeparator('.');
   MONEY = new DecimalFormat("$#.00", symbols);
  }
+
  /**
   * Appends to sb formatted value.
   * Trims string if its length > width.
